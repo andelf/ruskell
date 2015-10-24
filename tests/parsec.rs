@@ -1,7 +1,7 @@
 #![feature(vec_push_all)]
 #[macro_use]
 extern crate ruskell;
-use ruskell::parsec::{VecState, State, Status, Parsec, Monad};
+use ruskell::parsec::{VecState, State, Status, Parsec, Monad, Parser};
 use ruskell::parsec::atom::{one, eq, eof, one_of, none_of, ne};
 use ruskell::parsec::combinator::{try, either, many, many1, between, many_tail, many1_tail, Either, Or};
 use std::sync::Arc;
@@ -212,6 +212,22 @@ fn m_test_1() {
     let a = eq('a');
     let exp = a.then(eq('b')).over(eq('c')).over(eof());
     let re = exp(&mut state);
+    assert!(re.is_ok());
+    let data = re.unwrap();
+    assert_eq!(data, 'b');
+}
+
+#[test]
+fn m_test_2() {
+    let mut state = VecState::from_iter("abc".chars().into_iter());
+    let exp:Parser<char, char> = abc!(|state: &mut State<char>|->Status<char>{
+        try!(eq('a')(state));
+        let re = try!(eq('b')(state));
+        try!(eq('c')(state));
+        try!(eof()(state));
+        Ok(re)
+    });
+    let re = exp.parse(&mut state);
     assert!(re.is_ok());
     let data = re.unwrap();
     assert_eq!(data, 'b');

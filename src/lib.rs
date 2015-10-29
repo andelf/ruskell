@@ -1,4 +1,4 @@
-#![feature(core)]
+//#![feature(core)]
 #![feature(convert)]
 #![feature(unboxed_closures)]
 #![feature(vec_push_all)]

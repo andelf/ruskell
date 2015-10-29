@@ -156,19 +156,7 @@ pub trait Monad<T:'static, R:'static>:Parsec<T, R> where Self:Clone+'static, T:C
 
 pub type Status<T> = Result<T, ParsecError>;
 
-// A monad just return closure
-// pub struct Parser<T, R> {
-//     parser: Arc<Box<Fn(&mut State<T>)->Status<R>>>,
-// }
-
 pub type Parser<T, R> = Arc<Box<Fn(&mut State<T>)->Status<R>>>;
-
-// impl<T:'static, R:'static> Parser<T, R>
-// where T:Clone, R:Clone {
-//     pub fn new(parser: Arc<Box<Fn(&mut State<T>)->Status<R>>>)-> Parser<T, R> {
-//         Parser{parser:parser.clone()}
-//     }
-// }
 
 impl<T, R> Parsec<T, R> for Parser<T, R> where T:Clone, R:Clone {
     fn parse(&self, state: &mut State<T>) -> Status<R> {
@@ -176,49 +164,7 @@ impl<T, R> Parsec<T, R> for Parser<T, R> where T:Clone, R:Clone {
     }
 }
 
-// impl<'a, T, R> FnOnce<(&'a mut State<T>, )> for Parser<T, R> where T:Clone, R:Clone {
-//     type Output = Status<R>;
-//     extern "rust-call" fn call_once(self, _: (&'a mut State<T>, )) -> Status<R> {
-//         panic!("Not implement!");
-//     }
-// }
-//
-// impl<'a, T, R> FnMut<(&'a mut State<T>, )> for Parser<T, R> where T:Clone, R:Clone {
-//     extern "rust-call" fn call_mut(&mut self, _: (&'a mut State<T>, )) -> Status<R> {
-//         panic!("Not implement!");
-//     }
-// }
-//
-// impl<'a, T, R> Fn<(&'a mut State<T>, )> for Parser<T, R> where T:Clone, R:Clone {
-//     extern "rust-call" fn call(&self, args: (&'a mut State<T>, )) -> Status<R> {
-//         let (state, ) = args;
-//         self.parse(state)
-//     }
-// }
-
-// impl<T, R> Clone for Parser<T, R> where T:Clone, R:Clone {
-//     fn clone(&self)->Self {
-//         Parser{parser:self.parser.clone()}
-//     }
-//
-//     fn clone_from(&mut self, source: &Self) {
-//         self.parser = source.parser.clone();
-//     }
-// }
-
-// impl<T, R> Debug for Parser<T, R> where T:Clone, R:Clone{
-//     fn fmt(&self, formatter:&mut Formatter)->Result<(), fmt::Error> {
-//         write!(formatter, "<closure parser monad environment>")
-//     }
-// }
-
 impl<T:'static, R:'static> Monad<T, R> for Parser<T, R> where T:Clone, R:Clone {}
-
-// pub fn parser<T:'static, R:'static>(parser: Arc<Box<Fn(&mut State<T>)->Status<R>>>)->Parser<T, R>
-// where T:Clone, R:Clone {
-//     Parser::new(parser)
-// }
-
 
 pub mod atom;
 pub mod combinator;

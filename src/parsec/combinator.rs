@@ -47,9 +47,18 @@ impl<T:'static+Clone, R:'static+Clone> Or<T, R> for Either<T, R> {
 
 pub fn many<T:'static, R:'static, X:'static>(p:X)->Parser<T, Vec<R>>
 where T:Clone, R:Clone+Debug, X:Parsec<T, R>+Clone {
-    let p=p.clone();
+    let p=try(p.clone());
     abc!(move |state:&mut State<T>|->Status<Vec<R>>{
-        either(many1(try(p.clone())), pack(Vec::<R>::new())).parse(state)
+        let mut re = Vec::<R>::new();
+        loop {
+            let r = p.parse(state);
+            if r.is_ok() {
+                re.push(r.unwrap());
+            } else {
+                break;
+            }
+        }
+        Ok(re.clone())
     })
 }
 

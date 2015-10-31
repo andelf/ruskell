@@ -115,14 +115,14 @@ pub trait Parsec<T, R> {
 
 // Type Continuation(Result) Then Pass
 pub trait Monad<T:'static, R:'static>:Parsec<T, R> where Self:Clone+'static, T:Clone, R:Clone {
-    fn bind<P:'static+Clone>(self, binder:Arc<Box<Fn(&mut State<T>, R)->Status<P>>>)->Parser<T, P> {
+    fn bind<P:'static+Clone>(self, binder:Arc<Box<Fn(R, &mut State<T>)->Status<P>>>)->Parser<T, P> {
         abc!(move |state:&mut State<T>|->Status<P>{
             let pre = self.parse(state);
             if pre.is_err() {
                 return Err(pre.err().unwrap())
             }
             let binder = binder.clone();
-            binder(state, pre.ok().unwrap())
+            binder(pre.ok().unwrap(), state)
         })
     }
     fn then<P:'static+Clone, Thn:'static>(self, then:Thn)->Parser<T, P>

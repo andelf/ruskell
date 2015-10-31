@@ -54,88 +54,82 @@ pub fn space() -> OneOf<char> {
 }
 
 pub fn white_space() -> Parser<char, char> {
-    parser(abc!(|state: &mut State<char>| -> Status<char>{
+    abc!(|state: &mut State<char>| -> Status<char>{
         state.next_by(&|x:&char| x.is_whitespace())
-    }))
+    })
 }
 
 pub fn newline() -> Parser<char, String> {
-    parser(abc!(|state: &mut State<char>| -> Status<String>{
+    abc!(|state: &mut State<char>| -> Status<String>{
         let rel = eq('\r');
         let nl = eq('\n');
         let thn = either(try(nl.clone()).then(pack(String::from("\r\n"))),
                                 pack(String::from("\r")));
         either(rel.then(thn.clone()), nl.then(pack(String::from("\n")))).parse(state)
-    }))
+    })
 }
 
 pub fn digit() -> Parser<char, char> {
-    parser(abc!(|state: &mut State<char>| -> Status<char>{
+    abc!(|state: &mut State<char>| -> Status<char>{
         state.next_by(&|x:&char| x.is_numeric())
-    }))
+    })
 }
 
 pub fn alpha() -> Parser<char, char> {
-    parser(abc!(|state: &mut State<char>| -> Status<char>{
+    abc!(|state: &mut State<char>| -> Status<char>{
         state.next_by(&|x:&char| x.is_alphabetic())
-    }))
+    })
 }
 
 pub fn alphanumeric() -> Parser<char, char> {
-    parser(abc!(|state: &mut State<char>| -> Status<char>{
+    abc!(|state: &mut State<char>| -> Status<char>{
         state.next_by(&|x:&char| x.is_alphanumeric())
-    }))
+    })
 }
 
 pub fn control() -> Parser<char, char> {
-    parser(abc!(|state: &mut State<char>| -> Status<char>{
+    abc!(|state: &mut State<char>| -> Status<char>{
         state.next_by(&|x:&char| x.is_control())
-    }))
+    })
 }
 
 pub fn uinteger() -> Parser<char, String> {
-    parser(abc!(|state: &mut State<char>|-> Status<String> {
-        many1(digit()).bind(abc!(|_:&mut State<char>, x:Vec<char>| -> Status<String> {
-            Ok(x.iter().cloned().collect::<String>())
-        })).parse(state)
-    }))
+    abc!(|state: &mut State<char>|-> Status<String> {
+        let data = try!(many1(digit)(state))
+        Ok(.iter().cloned().collect::<String>())
+    })
 }
 
 pub fn integer() ->Parser<char, String>{
-    parser(abc!(|state: &mut State<char>|->Status<String>{
-        either(try(eq('-')).bind(abc!(|state: &mut State<char>, _:char|-> Status<String> {
-            let x = try!(uinteger().parse(state));
-            let mut re = String::from("-");
-            re.push_str(x.as_str());
-            Ok(re)
-        })), uinteger()).parse(state)
-    }))
+    abc!(|state: &mut State<char>|->Status<String>{
+        let mut re = String::from("");
+        if try(eq('-'))(state).is_ok() {
+            re.push_str("-");
+        }
+        let x = try!(uinteger()(state));
+        re.push_str(x.as_str());
+        Ok(re)
+    })
 }
 
 pub fn ufloat() -> Parser<char, String> {
-    parser(abc!(|state: &mut State<char>|->Status<String>{
-        let left = either(uinteger(), pack(String::from("0")));
-        let right = uinteger();
-        left.over(eq('.')).bind(abc!(move |state: &mut State<char>, x:String|->Status<String> {
-            let right = right.clone();
-            let rer = right.parse(state);
-            rer.map(|r:String|->String{
-                let mut re = String::from(x.as_str());
-                re.push('.');
-                re.push_str(r.as_str());
-                re
-            })
-        })).parse(state)
-    }))
+    abc!(|state: &mut State<char>|->Status<String>{
+        let mut re = try!(either(uinteger(), pack(String::from("0")))(state));
+        try!(eq('.')(state));
+        let x = try!(uinter(state));
+        re.push_str(x);
+        Ok(re)
+    })
 }
 
 pub fn float() -> Parser<char, String>{
-    parser(abc!(|state:&mut State<char>|->Status<String>{
-        either(try(eq('-')).bind(abc!(|state: &mut State<char>, _:char|-> Status<String> {
-            let x = try!(ufloat().parse(state));
-            let mut re = String::from("-");
-            re.push_str(x.as_str());
-            Ok(re)
-        })), ufloat()).parse(state)
-    }))
+    abc!(|state:&mut State<char>|->Status<String>{
+        let mut re = String::from("");
+        if try(eq('-'))(state).is_ok() {
+            re.push_str("-");
+        }
+        x = ufloat()(state)
+        re.push_str(x)
+        Ok(re)
+    })
 }

@@ -135,14 +135,14 @@ fn either_test_2() {
 fn monad_test_0() {
     let mut state = VecState::from_iter("abc".chars().into_iter());
     let a = eq('a');
-    let exp = a.bind(abc!(move |state:&mut State<char>, x:char|->Status<Vec<char>>{
+    let exp = a.bind(abc!(move |x:char, state:&mut State<char>|->Status<Vec<char>>{
             eq('b').parse(state).map(|y:char| -> Vec<char>{
                 let mut res = Vec::new();
                 res.push(x);
                 res.push(y);
                 res
             })
-        })).bind(abc!(move |state: &mut State<char>, v:Vec<char>|->Status<Vec<char>>{
+        })).bind(abc!(move |v:Vec<char>, state: &mut State<char>|->Status<Vec<char>>{
                 eq('c').parse(state).map(|x:char| -> Vec<char> {
                     let mut res = Vec::new();
                     res.push_all(&v);

@@ -63,14 +63,22 @@ where T:Clone, R:Clone+Debug, X:Parsec<T, R>+Clone {
 }
 
 pub fn many1<T:'static, R:'static, X:'static>(p:X)->Parser<T, Vec<R>>
-where T:Clone, R:Clone+Debug, X:Monad<T, R>+Clone {
-    p.clone().bind(abc!(move |x:R, state: &mut State<T>| -> Status<Vec<R>> {
-        let mut rev = Vec::new();
-        let tail = try!(many(p.clone()).parse(state));
-        rev.push(x);
-        rev.push_all(&tail);
-        Ok(rev)
-    }))
+where T:Clone, R:Clone+Debug, X:Parsec<T, R>+Clone {
+    abc!(move |state:&mut State<T>|->Status<Vec<R>>{
+        let first = try!(p.parse(state));
+        let mut re = Vec::new();
+        re.push(first);
+        let psc = try(p.clone());
+        loop {
+            let r = psc.parse(state);
+            if r.is_ok() {
+                re.push(r.unwrap());
+            } else {
+                break;
+            }
+        }
+        Ok(re.clone())
+    })
 }
 
 pub fn between<T:'static, B:'static, P:'static, E:'static, X:'static, Open:'static, Close:'static>

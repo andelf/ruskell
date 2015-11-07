@@ -2,14 +2,14 @@ use parsec::{State, ParsecError, Error, Status, Parser};
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
-pub fn one<T:'static>()->Parser<T, T> {
-    abc!(|state:&mut State<T>|->Status<T>{
+pub fn one<T:'static, Tran:'static>()->Parser<T, T, Tran> {
+    abc!(|state:&mut State<T, Tran>|->Status<T>{
         state.next().ok_or(ParsecError::new(state.pos(), String::from("eof")))
     })
 }
 
-pub fn eq<T:'static>(val:T) -> Parser<T, T> where T:Eq+Display+Debug+Clone {
-    abc!(move |state:&mut State<T>|->Status<T>{
+pub fn eq<T:'static, Tran:'static>(val:T) -> Parser<T, T, Tran> where T:Eq+Display+Debug+Clone {
+    abc!(move |state:&mut State<T, Tran>|->Status<T>{
         let value = state.next();
         let pos = state.pos();
         if value.is_some() {
@@ -26,8 +26,8 @@ pub fn eq<T:'static>(val:T) -> Parser<T, T> where T:Eq+Display+Debug+Clone {
 }
 
 
-pub fn ne<T:'static>(val:T) -> Parser<T, T> where T:Display+Eq+Debug+Clone {
-    abc!(move |state:&mut State<T>|->Status<T>{
+pub fn ne<T:'static, Tran:'static>(val:T) -> Parser<T, T, Tran> where T:Display+Eq+Debug+Clone {
+    abc!(move |state:&mut State<T, Tran>|->Status<T>{
         let value = state.next();
         let pos = state.pos();
         if value.is_some() {
@@ -43,8 +43,8 @@ pub fn ne<T:'static>(val:T) -> Parser<T, T> where T:Display+Eq+Debug+Clone {
     })
 }
 
-pub fn eof<T:'static+Display>()->Parser<T, ()> {
-    abc!(|state: &mut State<T>|->Status<()> {
+pub fn eof<T:'static+Display, Tran:'static>()->Parser<T, (), Tran> {
+    abc!(|state: &mut State<T, Tran>|->Status<()> {
         let val = state.next();
         if val.is_none() {
             Ok(())
@@ -56,9 +56,9 @@ pub fn eof<T:'static+Display>()->Parser<T, ()> {
     })
 }
 
-pub fn one_of<T:Eq+Debug+Display+Clone+'static>(elements:&Vec<T>) -> Parser<T, T> {
+pub fn one_of<T:Eq+Debug+Display+Clone+'static, Tran:'static>(elements:&Vec<T>) -> Parser<T, T, Tran> {
     let elements = elements.clone();
-    abc!(move |state: &mut State<T>|->Status<T>{
+    abc!(move |state: &mut State<T, Tran>|->Status<T>{
         let next = state.next();
         if next.is_none() {
             Err(ParsecError::new(state.pos(), String::from("eof")))
@@ -75,9 +75,9 @@ pub fn one_of<T:Eq+Debug+Display+Clone+'static>(elements:&Vec<T>) -> Parser<T, T
     })
 }
 
-pub fn none_of<T:Eq+Debug+Display+Clone+'static>(elements:&Vec<T>) -> Parser<T, T> {
+pub fn none_of<T:Eq+Debug+Display+Clone+'static, Tran:'static>(elements:&Vec<T>) -> Parser<T, T, Tran> {
     let elements = elements.clone();
-    abc!(move |state: &mut State<T>|->Status<T> {
+    abc!(move |state: &mut State<T, Tran>|->Status<T> {
         let next = state.next();
         if next.is_none() {
             Err(ParsecError::new(state.pos(), String::from("eof")))
@@ -94,14 +94,14 @@ pub fn none_of<T:Eq+Debug+Display+Clone+'static>(elements:&Vec<T>) -> Parser<T, 
     })
 }
 
-pub fn pack<T, R:Clone+'static>(element:R) -> Parser<T, R> {
-    abc!(move |_: &mut State<T>|->Status<R>{
+pub fn pack<T, R:Clone+'static, Tran:'static>(element:R) -> Parser<T, R, Tran> {
+    abc!(move |_: &mut State<T, Tran>|->Status<R>{
         Ok(element.clone())
     })
 }
 
-pub fn fail<T:'static+Clone, R>(description:String) -> Parser<T, R> {
-    abc!(move |state:&mut State<T>|->Status<R>{
+pub fn fail<T:'static+Clone, R, Tran:'static>(description:String) -> Parser<T, R, Tran> {
+    abc!(move |state:&mut State<T, Tran>|->Status<R>{
         Err(ParsecError::new(state.pos(), String::from(description.as_str())))
     })
 }

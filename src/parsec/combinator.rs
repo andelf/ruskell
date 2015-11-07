@@ -1,30 +1,32 @@
-use parsec::{State, Parsec, Status, Monad, Parser};
+use parsec::{State, Status, Monad, Parser, Parsec};
 use parsec::atom::{pack, fail};
 use std::fmt::{Debug};
 use std::sync::Arc;
 
-pub fn try<T:'static, R:'static, X:'static>(p:X)->Parser<T, R>
-where T:Clone, R:Clone, X:Parsec<T, R>+Clone {
-    abc!(move |state: &mut State<T>|->Status<R>{
-        let pos = state.pos();
+pub fn try<T:'static, R:'static, X:'static, Tran:'static>(p:X)->Parser<T, R, Tran>
+where T:Clone, R:Clone, X:Parsec<T, R, Tran>+Clone {
+    abc!(move |state: &mut State<T, Tran>|->Status<R>{
+        let tran = state.begin();
         let res = p.parse(state);
-        if res.is_err() {
-            state.seek_to(pos);
+        if res.is_ok() {
+            state.commit(tran);
+        } else {
+            state.rollback(tran);
         }
         res
     })
 }
 
-pub trait Or<T, R> {
-    fn or(&self, Parser<T, R>)->Parser<T, R>;
+pub trait Or<T, R, Tran> {
+    fn or(&self, Parser<T, R, Tran>)->Parser<T, R, Tran>;
 }
 
-pub type Either<T, R> = Arc<Box<Fn(&mut State<T>)->Status<R>>>;
-pub fn either<T, R, X:'static, Y:'static>(x:X, y:Y)->Either<T, R>
-where T:Clone, R:Clone, X:Parsec<T, R>+Clone, Y:Parsec<T, R>+Clone{
+pub type Either<T, R, Tran:'static> = Arc<Box<Fn(&mut State<T, Tran>)->Status<R>>>;
+pub fn either<T, R, X:'static, Y:'static, Tran:'static>(x:X, y:Y)->Either<T, R, Tran>
+where T:Clone, R:Clone, X:Parsec<T, R, Tran>+Clone, Y:Parsec<T, R, Tran>+Clone{
     let x = x.clone();
     let y = y.clone();
-    abc!(move |state:&mut State<T>|->Status<R>{
+    abc!(move |state:&mut State<T, Tran>|->Status<R>{
         let pos = state.pos();
         let val = x.parse(state);
         if val.is_ok() {
@@ -38,17 +40,17 @@ where T:Clone, R:Clone, X:Parsec<T, R>+Clone, Y:Parsec<T, R>+Clone{
         }
     })
 }
-impl<T:'static+Clone, R:'static+Clone> Or<T, R> for Either<T, R> {
-    fn or(&self, p:Parser<T, R>)->Parser<T, R>{
-        let s:Parser<T, R> = self.clone();
+impl<T:'static+Clone, R:'static+Clone, Tran:'static> Or<T, R, Tran> for Either<T, R, Tran> {
+    fn or(&self, p:Parser<T, R, Tran>)->Parser<T, R, Tran>{
+        let s:Parser<T, R, Tran> = self.clone();
         either(s, p)
     }
 }
 
-pub fn many<T:'static, R:'static, X:'static>(p:X)->Parser<T, Vec<R>>
-where T:Clone, R:Clone+Debug, X:Parsec<T, R>+Clone {
+pub fn many<T:'static, R:'static, X:'static, Tran:'static>(p:X)->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone+Debug, X:Parsec<T, R, Tran>+Clone {
     let p=try(p.clone());
-    abc!(move |state:&mut State<T>|->Status<Vec<R>>{
+    abc!(move |state:&mut State<T, Tran>|->Status<Vec<R>>{
         let mut re = Vec::<R>::new();
         loop {
             let r = p.parse(state);
@@ -62,9 +64,9 @@ where T:Clone, R:Clone+Debug, X:Parsec<T, R>+Clone {
     })
 }
 
-pub fn many1<T:'static, R:'static, X:'static>(p:X)->Parser<T, Vec<R>>
-where T:Clone, R:Clone+Debug, X:Parsec<T, R>+Clone {
-    abc!(move |state:&mut State<T>|->Status<Vec<R>>{
+pub fn many1<T:'static, R:'static, X:'static, Tran:'static>(p:X)->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone+Debug, X:Parsec<T, R, Tran>+Clone {
+    abc!(move |state:&mut State<T, Tran>|->Status<Vec<R>>{
         let first = try!(p.parse(state));
         let mut re = Vec::new();
         re.push(first);
@@ -81,15 +83,15 @@ where T:Clone, R:Clone+Debug, X:Parsec<T, R>+Clone {
     })
 }
 
-pub fn between<T:'static, B:'static, P:'static, E:'static, X:'static, Open:'static, Close:'static>
+pub fn between<T:'static, B:'static, P:'static, E:'static, X:'static, Open:'static, Close:'static, Tran:'static>
         (open:Open, close:Close, parsec:X)
-        ->Parser<T, P>
-where T:Clone, P:Clone, B:Clone, E:Clone, Open:Monad<T, B>+Clone, X:Parsec<T, P>+Clone,
-        Close:Parsec<T, E>+Clone {
+        ->Parser<T, P, Tran>
+where T:Clone, P:Clone, B:Clone, E:Clone, Open:Monad<T, B, Tran>+Clone, X:Parsec<T, P, Tran>+Clone,
+        Close:Parsec<T, E, Tran>+Clone {
     let open = open.clone();
     let parsec = parsec.clone();
     let close = close.clone();
-    abc!(move |state: &mut State<T>|->Status<P>{
+    abc!(move |state: &mut State<T, Tran>|->Status<P>{
         try!(open.parse(state));
         let re = parsec.parse(state);
         try!(close.parse(state));
@@ -97,37 +99,37 @@ where T:Clone, P:Clone, B:Clone, E:Clone, Open:Monad<T, B>+Clone, X:Parsec<T, P>
     })
 }
 
-pub fn otherwise<T:'static, R:'static, X:'static>(p:X, description:String)->Parser<T, R>
-where T:Clone, R:Clone, X:Parsec<T, R>+Clone {
-    abc!(move |state : &mut State<T>|->Status<R>{
+pub fn otherwise<T:'static, R:'static, X:'static, Tran:'static>(p:X, description:String)->Parser<T, R, Tran>
+where T:Clone, R:Clone, X:Parsec<T, R, Tran>+Clone {
+    abc!(move |state : &mut State<T, Tran>|->Status<R>{
         either(p.clone(), fail(description.clone()).clone()).parse(state)
     })
 }
 
-pub fn many_tail<T:'static, R:'static, Tl:'static, X:'static, Tail:'static>
-    (p:X, tail:Tail)->Parser<T, Vec<R>>
-where T:Clone, R:Clone+Debug, Tl:Clone, X:Parsec<T, R>+Clone, Tail:Parsec<T, Tl>+Clone{
-    abc!(move |state:&mut State<T>|->Status<Vec<R>>{
+pub fn many_tail<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Tran:'static>
+    (p:X, tail:Tail)->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone+Debug, Tl:Clone, X:Parsec<T, R, Tran>+Clone, Tail:Parsec<T, Tl, Tran>+Clone{
+    abc!(move |state:&mut State<T, Tran>|->Status<Vec<R>>{
         let p = p.clone();
         let tail = tail.clone();
         many(p).over(tail).parse(state)
     })
 }
 
-pub fn many1_tail<T:'static, R:'static, Tl:'static, X:'static, Tail:'static>
-    (p:X, tail:Tail)->Parser<T, Vec<R>>
-where T:Clone, R:Clone+Debug, Tl:Clone, X:Monad<T, R>+Clone, Tail:Parsec<T, Tl>+Clone{
+pub fn many1_tail<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Tran:'static>
+    (p:X, tail:Tail)->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone+Debug, Tl:Clone, X:Monad<T, R, Tran>+Clone, Tail:Parsec<T, Tl, Tran>+Clone{
     let p = p.clone();
     let tail = tail.clone();
-    abc!(move |state:&mut State<T>|->Status<Vec<R>>{
+    abc!(move |state:&mut State<T, Tran>|->Status<Vec<R>>{
         many1(p.clone()).over(tail.clone()).parse(state)
     })
 }
 
 // We can use many/many1 as skip, but them more effective.
-pub fn skip_many<T:'static, R:'static, X:'static>(p:X) ->Parser<T, Vec<R>>
-where T:Clone, R:Clone, X:Parsec<T, R>+Clone {
-    abc!(move |state: &mut State<T>|->Status<Vec<R>>{
+pub fn skip_many<T:'static, R:'static, X:'static, Tran:'static>(p:X) ->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone, X:Parsec<T, R, Tran>+Clone {
+    abc!(move |state: &mut State<T, Tran>|->Status<Vec<R>>{
         let p = try(p.clone());
         loop {
             let re = p.parse(state);
@@ -138,9 +140,9 @@ where T:Clone, R:Clone, X:Parsec<T, R>+Clone {
     })
 }
 
-pub fn skip_many1<T:'static, R:'static, X:'static>(p:X) ->Parser<T, Vec<R>>
-where T:Clone, R:Clone, X:Parsec<T, R>+Clone {
-    abc!(move |state: &mut State<T>|->Status<Vec<R>>{
+pub fn skip_many1<T:'static, R:'static, X:'static, Tran:'static>(p:X) ->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone, X:Parsec<T, R, Tran>+Clone {
+    abc!(move |state: &mut State<T, Tran>|->Status<Vec<R>>{
         let re = p.parse(state);
         if re.is_err() {
             return Err(re.err().unwrap());
@@ -149,18 +151,19 @@ where T:Clone, R:Clone, X:Parsec<T, R>+Clone {
     })
 }
 
-pub fn sep_by<T:'static, Sp:'static, R:'static, Sep:'static, X:'static>(parsec:X, sep:Sep)->Parser<T, Vec<R>>
-where T:Clone, R:Clone+Debug, Sp:Clone, Sep:Parsec<T, Sp>+Clone, X:Parsec<T, R>+Clone {
-    abc!(move |state:&mut State<T>|->Status<Vec<R>>{
+pub fn sep_by<T:'static, Sp:'static, R:'static, Sep:'static, X:'static, Tran:'static>(parsec:X, sep:Sep)->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone+Debug, Sp:Clone, Sep:Parsec<T, Sp, Tran>+Clone, X:Parsec<T, R, Tran>+Clone {
+    abc!(move |state:&mut State<T, Tran>|->Status<Vec<R>>{
         let s = try(sep.clone());
         let p = try(parsec.clone());
         either(sep_by1(p, s), pack(Vec::new())).parse(state)
     })
 }
 
-pub fn sep_by1<T:'static, Sp:'static, R:'static, Sep:'static, X:'static>(parsec:X, sep:Sep) ->Parser<T, Vec<R>>
-where T:Clone, R:Clone+Debug, Sp:Clone, Sep:Parsec<T, Sp>+Clone, X:Parsec<T, R>+Clone {
-    abc!(move |state: &mut State<T>|->Status<Vec<R>>{
+pub fn sep_by1<T:'static, Sp:'static, R:'static, Sep:'static, X:'static, Tran:'static>
+        (parsec:X, sep:Sep) ->Parser<T, Vec<R>, Tran>
+where T:Clone, R:Clone+Debug, Sp:Clone, Sep:Parsec<T, Sp, Tran>+Clone, X:Parsec<T, R, Tran>+Clone {
+    abc!(move |state: &mut State<T, Tran>|->Status<Vec<R>>{
         let parsec = parsec.clone();
         let x = parsec.parse(state);
         if x.is_err() {

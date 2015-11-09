@@ -2,24 +2,27 @@ use std::vec::Vec;
 use std::iter::FromIterator;
 use std::sync::Arc;
 use std::boxed::Box;
-use std::fmt::{Formatter, Display};
+use std::fmt::{Formatter, Debug, Display};
 use std::fmt;
 use std::clone::Clone;
 use std::convert::{From};
 use std::error;
 use std::cmp::{min};
+use std::marker::Reflect;
 
-pub trait State<T, Tran:'static> {
-    fn pos(&self)-> usize;
-    fn seek_to(&mut self, usize)->bool;
+pub trait State<T> {
+    type Index:Reflect+Debug;
+    type Tran;
+    fn pos(&self)-> Self::Index;
+    fn seek_to(&mut self, Self::Index)->bool;
     fn next(&mut self)->Option<T>;
-    fn next_by(&mut self, &Fn(&T)->bool)->Status<T>;
-    fn err(&self, description:String)->ParsecError {
+    fn next_by(&mut self, &Fn(&T)->bool)->Status<T, Self::Index>;
+    fn err(&self, description:String)->ParsecError<Self::Index> {
         ParsecError::new(self.pos(), description)
     }
-    fn begin(&mut self)->Tran;
-    fn commit(&mut self, Tran);
-    fn rollback(&mut self, Tran);
+    fn begin(&mut self)->Self::Tran;
+    fn commit(&mut self, Self::Tran);
+    fn rollback(&mut self, Self::Tran);
 }
 
 pub struct VecState<T> {
@@ -38,7 +41,9 @@ impl<A> FromIterator<A> for VecState<A> {
     }
 }
 
-impl<T> State<T, usize> for VecState<T> where T:Clone {
+impl<T> State<T> for VecState<T> where T:Clone {
+    type Index = usize;
+    type Tran = usize;
     fn pos(&self) -> usize {
         self.index
     }
@@ -59,7 +64,7 @@ impl<T> State<T, usize> for VecState<T> where T:Clone {
             None
         }
     }
-    fn next_by(&mut self, pred:&Fn(&T)->bool)->Status<T>{
+    fn next_by(&mut self, pred:&Fn(&T)->bool)->Status<T, usize>{
         if 0 as usize <= self.index && self.index < self.buffer.len() {
             let ref item = self.buffer[self.index];
             self.index += 1;
@@ -100,18 +105,18 @@ impl<T> State<T, usize> for VecState<T> where T:Clone {
 }
 
 pub trait Error:error::Error {
-    fn pos(&self)->usize;
+    type Index;
+    fn pos(&self)->Self::Index;
 }
 
 #[derive(Debug, Clone)]
-pub struct ParsecError {
-    _pos: usize,
+pub struct ParsecError<Index:Debug+Reflect+'static> {
+    _pos: Index,
     message: String,
-
 }
 
-impl ParsecError {
-    pub fn new(pos:usize, description:String)->ParsecError{
+impl<Index:Debug+Reflect+'static> ParsecError<Index> {
+    pub fn new(pos:Index, description:String)->ParsecError<Index>{
         ParsecError{
             _pos: pos,
             message: description,
@@ -119,12 +124,15 @@ impl ParsecError {
     }
 }
 
-impl Error for ParsecError {
-    fn pos(&self)->usize {
-        self._pos
+impl<Index:Debug+Reflect+Clone+'static> Error for ParsecError<Index> {
+    type Index = Index;
+    fn pos(&self)->Index {
+        let p = self._pos.clone();
+        p
     }
 }
-impl error::Error for ParsecError {
+
+impl<Index:Debug+Reflect+'static> error::Error for ParsecError<Index> {
     fn description(&self)->&str {
         self.message.as_str()
     }
@@ -133,21 +141,25 @@ impl error::Error for ParsecError {
     }
 }
 
-impl Display for ParsecError {
+impl<Index:Reflect+Debug> Display for ParsecError<Index> {
     fn fmt(&self, formatter:&mut Formatter) -> Result<(), fmt::Error> {
         write!(formatter, "{}", self.message)
     }
 }
 
 //pub trait Parsec<T:'static+Clone, R:'static+Clone>:Debug where Self:Parsec<T, R, Tran:'static>+Clone+'static {
-pub trait Parsec<T, R, Tran:'static> {
-    fn parse(&self, &mut State<T, Tran>)->Status<R>;
+pub trait Parsec<T, R> {
+    type Index:Reflect+Debug;
+    type Tran;
+    fn parse(&self, &mut State<T, Index=Self::Index, Tran=Self::Tran>)->Status<R, Self::Index>;
 }
 
 // Type Continuation(Result) Then Pass
-pub trait Monad<T:'static, R:'static, Tran:'static>:Parsec<T, R, Tran> where Self:Clone+'static, T:Clone, R:Clone {
-    fn bind<P:'static+Clone>(self, binder:Arc<Box<Fn(R, &mut State<T, Tran>)->Status<P>>>)->Parser<T, P, Tran> {
-        abc!(move |state:&mut State<T, Tran>|->Status<P>{
+pub trait Monad<T:'static, R:'static>:Parsec<T, R>
+        where Self:Clone+'static, T:Clone, R:Clone {
+    fn bind<P:'static+Clone>(self, binder:Arc<Box<Fn(R, &mut State<T, Index=Self::Index, Tran=Self::Tran>)
+                ->Status<P, Self::Index>>>)->Parser<T, P, Self::Index, Self::Tran> {
+        abc!(move |state:&mut State<T, Index=Self::Index, Tran=Self::Tran>|->Status<P, Self::Index>{
             let pre = self.parse(state);
             if pre.is_err() {
                 return Err(pre.err().unwrap())
@@ -156,10 +168,10 @@ pub trait Monad<T:'static, R:'static, Tran:'static>:Parsec<T, R, Tran> where Sel
             binder(pre.ok().unwrap(), state)
         })
     }
-    fn then<P:'static+Clone, Thn:'static>(self, then:Thn)->Parser<T, P, Tran>
-    where Thn:Parsec<T, P, Tran>+Clone{
+    fn then<P:'static+Clone, Thn:'static>(self, then:Thn)->Parser<T, P, Self::Index, Self::Tran>
+    where Thn:Parsec<T, P, Index=Self::Index, Tran=Self::Tran>+Clone {
         let then = then.clone();
-        abc!(move |state:&mut State<T, Tran>|->Status<P>{
+        abc!(move |state:&mut State<T, Index=Self::Index, Tran=Self::Tran>|->Status<P, Thn::Index>{
             let pre = self.parse(state);
             if pre.is_err() {
                 return Err(pre.err().unwrap())
@@ -167,10 +179,10 @@ pub trait Monad<T:'static, R:'static, Tran:'static>:Parsec<T, R, Tran> where Sel
             then.parse(state)
         })
     }
-    fn over<P:'static+Clone, Ovr:'static>(self, over:Ovr)->Parser<T, R, Tran>
-    where Ovr:Parsec<T, P, Tran>+Clone{
+    fn over<P:'static+Clone, Ovr:'static>(self, over:Ovr)->Parser<T, R, Self::Index, Self::Tran>
+    where Ovr:Parsec<T, P, Index=Self::Index, Tran=Self::Tran>+Clone{
         let over = over.clone();
-        abc!(move |state:&mut State<T, Tran>|->Status<R>{
+        abc!(move |state:&mut State<T, Index=Self::Index, Tran=Self::Tran>|->Status<R, Self::Index>{
             let re = self.parse(state);
             if re.is_err() {
                 return re;
@@ -184,17 +196,19 @@ pub trait Monad<T:'static, R:'static, Tran:'static>:Parsec<T, R, Tran> where Sel
     }
 }
 
-pub type Status<T> = Result<T, ParsecError>;
+pub type Status<T, Index> = Result<T, ParsecError<Index>>;
 
-pub type Parser<T, R, Tran:'static> = Arc<Box<Fn(&mut State<T, Tran>)->Status<R>>>;
+pub type Parser<T, R, Index, Tran> = Arc<Box<Fn(&mut State<T, Index=Index, Tran=Tran>)->Status<R, Index>>>;
 
-impl<T, R, Tran:'static> Parsec<T, R, Tran> for Parser<T, R, Tran> where T:Clone, R:Clone {
-    fn parse(&self, state: &mut State<T, Tran>) -> Status<R> {
+impl<T, R, Index:Debug+Reflect+'static, Tran:'static> Parsec<T, R> for Parser<T, R, Index, Tran> where T:Clone, R:Clone {
+    type Index=Index;
+    type Tran=Tran;
+    fn parse(&self, state: &mut State<T, Index=Index, Tran=Tran>) -> Status<R, Index> {
         self(state)
     }
 }
 
-impl<T:'static, R:'static, Tran:'static> Monad<T, R, Tran> for Parser<T, R, Tran> where T:Clone, R:Clone {}
+impl<T:'static, R:'static, Index:Debug+Reflect+'static, Tran:'static> Monad<T, R> for Parser<T, R, Index, Tran> where T:Clone, R:Clone {}
 
 pub mod atom;
 pub mod combinator;

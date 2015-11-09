@@ -2,6 +2,7 @@
 #![feature(unboxed_closures)]
 #![feature(vec_push_all)]
 #![feature(custom_derive)]
+#![feature(reflect_marker)]
 
 //Arc<Box<Closure>>
 #[macro_export]

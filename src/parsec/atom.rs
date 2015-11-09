@@ -1,15 +1,17 @@
 use parsec::{State, ParsecError, Error, Status, Parser};
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
+use std::marker::Reflect;
 
-pub fn one<T:'static, Tran:'static>()->Parser<T, T, Tran> {
-    abc!(|state:&mut State<T, Tran>|->Status<T>{
+pub fn one<T:'static, Index:Reflect+Debug+'static, Tran:'static>()->Parser<T, T, Index, Tran> {
+    abc!(|state:&mut State<T, Index=Index, Tran=Tran>|->Status<T, Index>{
         state.next().ok_or(ParsecError::new(state.pos(), String::from("eof")))
     })
 }
 
-pub fn eq<T:'static, Tran:'static>(val:T) -> Parser<T, T, Tran> where T:Eq+Display+Debug+Clone {
-    abc!(move |state:&mut State<T, Tran>|->Status<T>{
+pub fn eq<T:'static, Index:Reflect+Debug+Display+'static, Tran:'static>(val:T)
+            -> Parser<T, T, Index, Tran> where T:Eq+Display+Debug+Clone {
+    abc!(move |state:&mut State<T, Index=Index, Tran=Tran>|->Status<T, Index>{
         let value = state.next();
         let pos = state.pos();
         if value.is_some() {
@@ -26,8 +28,9 @@ pub fn eq<T:'static, Tran:'static>(val:T) -> Parser<T, T, Tran> where T:Eq+Displ
 }
 
 
-pub fn ne<T:'static, Tran:'static>(val:T) -> Parser<T, T, Tran> where T:Display+Eq+Debug+Clone {
-    abc!(move |state:&mut State<T, Tran>|->Status<T>{
+pub fn ne<T:'static, Index:Reflect+Debug+Display+'static, Tran:'static>(val:T)
+            -> Parser<T, T, Index, Tran> where T:Display+Eq+Debug+Clone {
+    abc!(move |state:&mut State<T, Index=Index, Tran=Tran>|->Status<T, Index>{
         let value = state.next();
         let pos = state.pos();
         if value.is_some() {
@@ -43,8 +46,8 @@ pub fn ne<T:'static, Tran:'static>(val:T) -> Parser<T, T, Tran> where T:Display+
     })
 }
 
-pub fn eof<T:'static+Display, Tran:'static>()->Parser<T, (), Tran> {
-    abc!(|state: &mut State<T, Tran>|->Status<()> {
+pub fn eof<T:'static+Display, Index:Reflect+Debug+Display+'static, Tran:'static>()->Parser<T, (), Index, Tran> {
+    abc!(|state: &mut State<T, Index=Index, Tran=Tran>|->Status<(), Index> {
         let val = state.next();
         if val.is_none() {
             Ok(())
@@ -56,9 +59,10 @@ pub fn eof<T:'static+Display, Tran:'static>()->Parser<T, (), Tran> {
     })
 }
 
-pub fn one_of<T:Eq+Debug+Display+Clone+'static, Tran:'static>(elements:&Vec<T>) -> Parser<T, T, Tran> {
+pub fn one_of<T:Eq+Debug+Display+Clone+'static, Index:Reflect+Debug+Display+'static, Tran:'static>(elements:&Vec<T>)
+            -> Parser<T, T, Index, Tran> {
     let elements = elements.clone();
-    abc!(move |state: &mut State<T, Tran>|->Status<T>{
+    abc!(move |state: &mut State<T, Index=Index, Tran=Tran>|->Status<T, Index>{
         let next = state.next();
         if next.is_none() {
             Err(ParsecError::new(state.pos(), String::from("eof")))
@@ -75,9 +79,9 @@ pub fn one_of<T:Eq+Debug+Display+Clone+'static, Tran:'static>(elements:&Vec<T>) 
     })
 }
 
-pub fn none_of<T:Eq+Debug+Display+Clone+'static, Tran:'static>(elements:&Vec<T>) -> Parser<T, T, Tran> {
+pub fn none_of<T:Eq+Debug+Display+Clone+'static, Index:Reflect+Debug+Display+'static, Tran:'static>(elements:&Vec<T>) -> Parser<T, T, Index, Tran> {
     let elements = elements.clone();
-    abc!(move |state: &mut State<T, Tran>|->Status<T> {
+    abc!(move |state: &mut State<T, Index=Index, Tran=Tran>|->Status<T, Index> {
         let next = state.next();
         if next.is_none() {
             Err(ParsecError::new(state.pos(), String::from("eof")))
@@ -94,14 +98,14 @@ pub fn none_of<T:Eq+Debug+Display+Clone+'static, Tran:'static>(elements:&Vec<T>)
     })
 }
 
-pub fn pack<T, R:Clone+'static, Tran:'static>(element:R) -> Parser<T, R, Tran> {
-    abc!(move |_: &mut State<T, Tran>|->Status<R>{
+pub fn pack<T, R:Clone+'static, Index:Reflect+Debug+'static, Tran:'static>(element:R) -> Parser<T, R, Index, Tran> {
+    abc!(move |_: &mut State<T, Index=Index, Tran=Tran>|->Status<R, Index>{
         Ok(element.clone())
     })
 }
 
-pub fn fail<T:'static+Clone, R, Tran:'static>(description:String) -> Parser<T, R, Tran> {
-    abc!(move |state:&mut State<T, Tran>|->Status<R>{
+pub fn fail<T:'static+Clone, R, Index:Reflect+Debug+Display+'static, Tran:'static>(description:String) -> Parser<T, R, Index, Tran> {
+    abc!(move |state:&mut State<T, Index=Index, Tran=Tran>|->Status<R, Index>{
         Err(ParsecError::new(state.pos(), String::from(description.as_str())))
     })
 }

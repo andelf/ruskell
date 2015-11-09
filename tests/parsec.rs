@@ -124,9 +124,10 @@ fn either_test_2() {
     let a = eq('a');
     let b = eq('b');
     let c = eq('c');
-    let e:Either<char, char, usize> = either(try(b), try(c)).or(try(a));
+    let e:Either<char, char, usize, usize> = either(try(b), try(c)).or(try(a));
     let re = e(&mut state);
-    assert!(re.is_ok());
+    let ok:bool = re.is_ok();
+    assert!(ok);
     let data = re.unwrap();
     assert_eq!(data, 'a');
 }
@@ -135,14 +136,15 @@ fn either_test_2() {
 fn monad_test_0() {
     let mut state = VecState::from_iter("abc".chars().into_iter());
     let a = eq('a');
-    let exp = a.bind(abc!(move |x:char, state:&mut State<char, usize>|->Status<Vec<char>>{
+
+    let exp = a.bind(abc!(move |x:char, state|->Status<Vec<char>, usize>{
             eq('b').parse(state).map(|y:char| -> Vec<char>{
                 let mut res = Vec::new();
                 res.push(x);
                 res.push(y);
                 res
             })
-        })).bind(abc!(move |v:Vec<char>, state: &mut State<char, usize>|->Status<Vec<char>>{
+        })).bind(abc!(move |v:Vec<char>, state|->Status<Vec<char>, usize>{
                 eq('c').parse(state).map(|x:char| -> Vec<char> {
                     let mut res = Vec::new();
                     res.push_all(&v);
@@ -220,7 +222,7 @@ fn m_test_1() {
 #[test]
 fn m_test_2() {
     let mut state = VecState::from_iter("abc".chars().into_iter());
-    let exp:Parser<char, char, usize> = abc!(|state: &mut State<char, usize>|->Status<char>{
+    let exp:Parser<char, char, usize, usize> = abc!(|state|->Status<char, usize>{
         try!(eq('a')(state));
         let re = try!(eq('b')(state));
         try!(eq('c')(state));

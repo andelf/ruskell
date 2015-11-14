@@ -7,7 +7,6 @@ use std::fmt;
 use std::clone::Clone;
 use std::convert::{From};
 use std::error;
-use std::cmp::{min};
 use std::marker::Reflect;
 
 pub trait State<T> {
@@ -80,8 +79,6 @@ impl<T> State<T> for VecState<T> where T:Clone {
     fn begin(&mut self)-> usize {
         if self.tran.is_none() {
             self.tran = Some(self.index);
-        } else {
-            self.tran = Some(min(self.tran.unwrap(), self.index));
         }
         self.index
     }

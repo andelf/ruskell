@@ -113,7 +113,7 @@ where T:Clone, R:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+Clone {
     })
 }
 
-pub fn many_tail<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Index:Reflect+Debug+'static, Tran:'static>
+pub fn many_til<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Index:Reflect+Debug+'static, Tran:'static>
     (p:X, tail:Tail)->Parser<T, Vec<R>, Index, Tran>
 where T:Clone, R:Clone+Debug, Tl:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+Clone,
             Tail:Parsec<T, Tl, Index=Index, Tran=Tran>+Clone{
@@ -188,7 +188,7 @@ where T:Clone, R:Clone+Debug, Sp:Clone, Sep:Parsec<T, Sp, Index=Index, Tran=Tran
         let tail = sep_by(parsec.clone(), sep.clone()).parse(state);
         let data = tail.unwrap();
         rev.push(head);
-        rev.push_all(&data);
+        rev.extend_from_slice(&data);
         Ok(rev)
     })
 }

@@ -1,6 +1,5 @@
 #![feature(convert)]
 #![feature(unboxed_closures)]
-#![feature(vec_push_all)]
 #![feature(custom_derive)]
 #![feature(reflect_marker)]
 

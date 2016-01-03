@@ -124,7 +124,7 @@ where T:Clone, R:Clone+Debug, Tl:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+C
     })
 }
 
-pub fn many1_tail<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Index:PartialEq+Reflect+Debug+'static, Tran:'static>
+pub fn many1_til<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Index:PartialEq+Reflect+Debug+'static, Tran:'static>
     (p:X, tail:Tail)->Parser<T, Vec<R>, Index, Tran>
 where T:Clone, R:Clone+Debug, Tl:Clone, X:Monad<T, R, Index=Index, Tran=Tran>+Clone,
                 Tail:Parsec<T, Tl, Index=Index, Tran=Tran>+Clone{

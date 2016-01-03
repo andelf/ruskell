@@ -2,7 +2,7 @@
 extern crate ruskell;
 use ruskell::parsec::{VecState, State, Status, Parsec, Monad, Parser};
 use ruskell::parsec::atom::{one, eq, eof, one_of, none_of, ne};
-use ruskell::parsec::combinator::{try, either, many, many1, between, many_til, many1_tail, Either, Or};
+use ruskell::parsec::combinator::{try, either, many, many1, between, many_til, many1_til, Either, Or};
 use std::sync::Arc;
 use std::iter::FromIterator;
 use std::error::Error;
@@ -369,9 +369,9 @@ fn many_til_test_1() {
 }
 
 #[test]
-fn many1_tail_test_0() {
+fn many1_til_test_0() {
     let mut state = VecState::from_iter("This is a string.".chars());
-    let content = many1_tail(ne('.'), eq('.'));
+    let content = many1_til(ne('.'), eq('.'));
     let re = content(&mut state);
     if re.is_err() {
         let msg = format!("{}", re.unwrap_err().description());
@@ -383,9 +383,9 @@ fn many1_tail_test_0() {
 }
 
 #[test]
-fn many1_tail_test_1() {
+fn many1_til_test_1() {
     let mut state = VecState::from_iter("This is a string.".chars());
-    let content = many1_tail(one(), eof());
+    let content = many1_til(one(), eof());
     let re = content(&mut state);
     if re.is_err() {
         let msg = format!("{}", re.unwrap_err().description());

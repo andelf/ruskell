@@ -50,7 +50,7 @@ impl State<char> for StringState {
 }
 
 pub fn space() -> OneOf<char> {
-    one_of(&vec![' ', '\t'])
+    char(' ')
 }
 
 pub fn white_space() -> Parser<char, char> {

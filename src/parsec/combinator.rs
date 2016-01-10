@@ -113,30 +113,28 @@ where T:Clone, R:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+Clone {
     })
 }
 
-pub fn many_til<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Index:Reflect+Debug+'static, Tran:'static>
-    (p:X, tail:Tail)->Parser<T, Vec<R>, Index, Tran>
+pub fn many_till<T:'static, R:'static, Tl:'static, X:'static, Till:'static, Index:Reflect+Debug+'static, Tran:'static>
+    (p:X, till:Till)->Parser<T, Vec<R>, Index, Tran>
 where T:Clone, R:Clone+Debug, Tl:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+Clone,
-            Tail:Parsec<T, Tl, Index=Index, Tran=Tran>+Clone{
+            Till:Parsec<T, Tl, Index=Index, Tran=Tran>+Clone{
     abc!(move |state:&mut State<T, Index=Index, Tran=Tran>|->Status<Vec<R>, Index>{
         let p = p.clone();
-        let tail = tail.clone();
-        many(p).over(tail).parse(state)
-    })
-}
-
-pub fn many1_til<T:'static, R:'static, Tl:'static, X:'static, Tail:'static, Index:PartialEq+Reflect+Debug+'static, Tran:'static>
-    (p:X, tail:Tail)->Parser<T, Vec<R>, Index, Tran>
-where T:Clone, R:Clone+Debug, Tl:Clone, X:Monad<T, R, Index=Index, Tran=Tran>+Clone,
-                Tail:Parsec<T, Tl, Index=Index, Tran=Tran>+Clone{
-    let p = p.clone();
-    let tail = tail.clone();
-    abc!(move |state:&mut State<T, Index=Index, Tran=Tran>|->Status<Vec<R>, Index>{
-        many1(p.clone()).over(tail.clone()).parse(state)
+        let end = try(till.clone());
+        let mut re = Vec::<R>::new();
+        loop {
+            let stop = end.parse(state);
+            if stop.is_ok() {
+                return Ok(re.clone());
+            } else {
+                let item = try!(p.parse(state));
+                re.push(item);
+            }
+        }
     })
 }
 
 // We can use many/many1 as skip, but them more effective.
-pub fn skip_many<T:'static, R:'static, X:'static, Index:PartialEq+Reflect+Debug+'static, Tran:'static>
+pub fn skip<T:'static, R:'static, X:'static, Index:PartialEq+Reflect+Debug+'static, Tran:'static>
         (p:X) ->Parser<T, Vec<R>, Index, Tran>
 where T:Clone, R:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+Clone {
     abc!(move |state: &mut State<T, Index=Index, Tran=Tran>|->Status<Vec<R>, Index>{
@@ -150,15 +148,12 @@ where T:Clone, R:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+Clone {
     })
 }
 
-pub fn skip_many1<T:'static, R:'static, X:'static, Index:PartialEq+Reflect+Debug+'static, Tran:'static>
+pub fn skip1<T:'static, R:'static, X:'static, Index:PartialEq+Reflect+Debug+'static, Tran:'static>
         (p:X) ->Parser<T, Vec<R>, Index, Tran>
 where T:Clone, R:Clone, X:Parsec<T, R, Index=Index, Tran=Tran>+Clone {
     abc!(move |state: &mut State<T, Index=Index, Tran=Tran>|->Status<Vec<R>, Index>{
-        let re = p.parse(state);
-        if re.is_err() {
-            return Err(re.err().unwrap());
-        }
-        skip_many(p.clone()).parse(state)
+        try!(p.parse(state));
+        skip(p.clone()).parse(state)
     })
 }
 

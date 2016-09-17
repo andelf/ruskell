@@ -35,7 +35,7 @@ impl<A> FromIterator<A> for VecState<A> {
         VecState{
             index:0,
             tran:None,
-            buffer:Vec::from_iter(iterator.into_iter()),
+            buffer:iterator.into_iter().collect(),
         }
     }
 }
@@ -47,7 +47,7 @@ impl<T> State<T> for VecState<T> where T:Clone {
         self.index
     }
     fn seek_to(&mut self, to:usize) -> bool {
-        if 0 as usize <= to && to < self.buffer.len() {
+        if to < self.buffer.len() {
             self.index = to;
             true
         } else {
@@ -55,7 +55,7 @@ impl<T> State<T> for VecState<T> where T:Clone {
         }
     }
     fn next(&mut self)->Option<T>{
-        if 0 as usize <= self.index && self.index < self.buffer.len() {
+        if self.index < self.buffer.len() {
             let item = self.buffer[self.index].clone();
             self.index += 1;
             Some(item)
@@ -64,8 +64,8 @@ impl<T> State<T> for VecState<T> where T:Clone {
         }
     }
     fn next_by(&mut self, pred:&Fn(&T)->bool)->Status<T, usize>{
-        if 0 as usize <= self.index && self.index < self.buffer.len() {
-            let ref item = self.buffer[self.index];
+        if self.index < self.buffer.len() {
+            let item = &self.buffer[self.index];
             self.index += 1;
             if pred(item) {
                 Ok(item.clone())
@@ -84,24 +84,20 @@ impl<T> State<T> for VecState<T> where T:Clone {
     }
 
     fn commit(&mut self, tran:usize) {
-        if self.tran.is_some() {
-            if self.tran.unwrap() == tran {
-                self.tran = None;
-            }
+        if self.tran.map_or(false, |t| t == tran) {
+            self.tran = None;
         }
     }
 
     fn rollback(&mut self, tran:usize) {
         self.index = tran;
-        if self.tran.is_some() {
-            if self.tran.unwrap() == tran {
-                self.tran = None;
-            }
+        if self.tran.map_or(false, |t| t == tran) {
+            self.tran = None;
         }
     }
 }
 
-pub trait Error:error::Error {
+pub trait Error: error::Error {
     type Index;
     fn pos(&self)->Self::Index;
 }
@@ -124,8 +120,7 @@ impl<Index:Debug+Reflect+'static> ParsecError<Index> {
 impl<Index:Debug+Reflect+Clone+'static> Error for ParsecError<Index> {
     type Index = Index;
     fn pos(&self)->Index {
-        let p = self._pos.clone();
-        p
+        self._pos.clone()
     }
 }
 

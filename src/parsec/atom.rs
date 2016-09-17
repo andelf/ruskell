@@ -1,4 +1,4 @@
-use parsec::{State, ParsecError, Error, Status, Parser};
+use parsec::{State, ParsecError, Status, Parser};
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use std::marker::Reflect;
@@ -59,16 +59,16 @@ pub fn eof<T:'static+Display, Index:Reflect+Debug+Display+'static, Tran:'static>
     })
 }
 
-pub fn one_of<T:Eq+Debug+Display+Clone+'static, Index:Reflect+Debug+Display+'static, Tran:'static>(elements:&Vec<T>)
+pub fn one_of<T:Eq+Debug+Display+Clone+'static, Index:Reflect+Debug+Display+'static, Tran:'static>(elements:&[T])
             -> Parser<T, T, Index, Tran> {
-    let elements = elements.clone();
+    let elements = elements.to_owned();
     abc!(move |state: &mut State<T, Index=Index, Tran=Tran>|->Status<T, Index>{
         let next = state.next();
         if next.is_none() {
             Err(ParsecError::new(state.pos(), String::from("eof")))
         } else {
             let it = next.unwrap();
-            for d in elements.iter() {
+            for d in &elements {
                 if d == &it {
                     return Ok(it);
                 }
@@ -79,21 +79,21 @@ pub fn one_of<T:Eq+Debug+Display+Clone+'static, Index:Reflect+Debug+Display+'sta
     })
 }
 
-pub fn none_of<T:Eq+Debug+Display+Clone+'static, Index:Reflect+Debug+Display+'static, Tran:'static>(elements:&Vec<T>) -> Parser<T, T, Index, Tran> {
-    let elements = elements.clone();
+pub fn none_of<T:Eq+Debug+Display+Clone+'static, Index:Reflect+Debug+Display+'static, Tran:'static>(elements:&[T]) -> Parser<T, T, Index, Tran> {
+    let elements = elements.to_owned();
     abc!(move |state: &mut State<T, Index=Index, Tran=Tran>|->Status<T, Index> {
         let next = state.next();
         if next.is_none() {
             Err(ParsecError::new(state.pos(), String::from("eof")))
         } else {
             let it = next.unwrap();
-            for d in elements.iter() {
+            for d in &elements {
                 if d == &it {
                     let description = format!("<expect none of {:?} at {}, got:{}>", elements, state.pos(), it);
                     return Err(ParsecError::new(state.pos(), String::from(description)))
                 }
             }
-            return Ok(it);
+            Ok(it)
         }
     })
 }

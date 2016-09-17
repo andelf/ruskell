@@ -1,4 +1,3 @@
-#![feature(convert)]
 #![feature(unboxed_closures)]
 #![feature(custom_derive)]
 #![feature(reflect_marker)]
